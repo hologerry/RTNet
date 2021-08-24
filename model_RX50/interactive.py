@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from .spatial import Spatial
 from .temporal import Temporal
 from .Attention import RTModule, SelfModule, STAFM
+
+
 class Interactive(nn.Module):
     def __init__(self, spatial_ckpt=None, temporal_ckpt=None):
         super(Interactive, self).__init__()
@@ -15,16 +17,16 @@ class Interactive(nn.Module):
         if temporal_ckpt is not None:
             self.temporal_net.load_state_dict(torch.load(temporal_ckpt, map_location='cpu')['state_dict'])
             print("Successfully load temporal:{}".format(temporal_ckpt))
-        head=1
+        head = 1
         self.SSTransformer1 = RTModule(256, h=head, ST=False, redunction=True)
         self.SSTransformer2 = RTModule(512, h=head*2, ST=False)
         self.SSTransformer3 = RTModule(1024, h=head*4, ST=False)
         self.SSTransformer4 = RTModule(2048, h=head*8, ST=False)
-        self.STTransformer1 = RTModule(256, h=1, ST=True, redunction=True) #kv=S
+        self.STTransformer1 = RTModule(256, h=1, ST=True, redunction=True)  # kv=S
         self.STTransformer2 = RTModule(512, h=head*2, ST=True)
         self.STTransformer3 = RTModule(1024, h=head*4, ST=True)
         self.STTransformer4 = RTModule(2048, h=head*8, ST=True)
-        self.SselfTransformer1 = SelfModule(256, h=head*1, redunction=True) #kv=S
+        self.SselfTransformer1 = SelfModule(256, h=head*1, redunction=True)  # kv=S
         self.SselfTransformer2 = SelfModule(512, h=head*2)
         self.SselfTransformer3 = SelfModule(1024, h=head*4)
         self.SselfTransformer4 = SelfModule(2048, h=head*8)
@@ -40,7 +42,6 @@ class Interactive(nn.Module):
         self.Transformerstafm3 = STAFM(256, 4)
         self.Transformerstafm2 = STAFM(128, 2)
         self.Transformerstafm1 = STAFM(64, 1)
-
 
     def spatial_decoder(self, x, spatial_f, temporal_f):
         feature4 = self.spatial_net.decoder4(x)
@@ -90,12 +91,12 @@ class Interactive(nn.Module):
         temporal0 = self.temporal_net.inconv(flow.view(B*Seq, C*2, H, W))
         _, C, H, W = spatial0.size()
 
-        spatial1 = self.spatial_net.encoder1(spatial0)#64 128
+        spatial1 = self.spatial_net.encoder1(spatial0)  # 64 128
         temporal1 = self.temporal_net.encoder1(temporal0)
         _, C, H, W = spatial1.size()
         spatial1_1, spatial1_2 = spatial1.view(B, Seq, C, H, W).chunk(2, dim=1)
         spatial1_1, spatial1_2 = spatial1_1.squeeze(1), spatial1_2.squeeze(1)
-        temporal1_1, temporal1_2 = temporal1.view(B, Seq, C, H , W).chunk(2, dim=1)
+        temporal1_1, temporal1_2 = temporal1.view(B, Seq, C, H, W).chunk(2, dim=1)
         temporal1_1, temporal1_2 = temporal1_1.squeeze(1), temporal1_2.squeeze(1)
 
         S1_1S, S1_2S = self.SSTransformer1(spatial1_1, spatial1_2)
@@ -111,7 +112,7 @@ class Interactive(nn.Module):
         h1_spatial = torch.cat([S1_1, S1_2], 0)
         h1_temporal = torch.cat([T1_1, T1_2], 0)
 
-        spatial2 = self.spatial_net.encoder2(h1_spatial)#128 64
+        spatial2 = self.spatial_net.encoder2(h1_spatial)  # 128 64
         temporal2 = self.temporal_net.encoder2(h1_temporal)
         _, C, H, W = spatial2.size()
         spatial2_1, spatial2_2 = spatial2.view(B, Seq, C, H, W).chunk(2, dim=1)
@@ -132,7 +133,7 @@ class Interactive(nn.Module):
         h2_spatial = torch.cat([S2_1, S2_2], 0)
         h2_temporal = torch.cat([T2_1, T2_2], 0)
 
-        spatial3 = self.spatial_net.encoder3(h2_spatial)#256 32
+        spatial3 = self.spatial_net.encoder3(h2_spatial)  # 256 32
         temporal3 = self.temporal_net.encoder3(h2_temporal)
         _, C, H, W = spatial3.size()
         spatial3_1, spatial3_2 = spatial3.view(B, Seq, C, H, W).chunk(2, dim=1)
@@ -153,7 +154,7 @@ class Interactive(nn.Module):
         h3_spatial = torch.cat([S3_1, S3_2], 0)
         h3_temporal = torch.cat([T3_1, T3_2], 0)
 
-        spatial4 = self.spatial_net.encoder4(h3_spatial)#512 16
+        spatial4 = self.spatial_net.encoder4(h3_spatial)  # 512 16
         temporal4 = self.temporal_net.encoder4(h3_temporal)
         _, C, H, W = spatial4.size()
         spatial4_1, spatial4_2 = spatial4.view(B, Seq, C, H, W).chunk(2, dim=1)
@@ -175,16 +176,16 @@ class Interactive(nn.Module):
         h4_temporal = torch.cat([T4_1, T4_2], 0)
 
         spatial5 = torch.cat((self.spatial_net.dilation0(h4_spatial),
-            self.spatial_net.dilation1(h4_spatial),
-            self.spatial_net.dilation2(h4_spatial),
-            self.spatial_net.dilation3(h4_spatial),
-            self.spatial_net.dilation4(h4_spatial)), 1)
+                              self.spatial_net.dilation1(h4_spatial),
+                              self.spatial_net.dilation2(h4_spatial),
+                              self.spatial_net.dilation3(h4_spatial),
+                              self.spatial_net.dilation4(h4_spatial)), 1)
 
         temporal5 = torch.cat((self.temporal_net.dilation0(h4_temporal),
-            self.temporal_net.dilation1(h4_temporal),
-            self.temporal_net.dilation2(h4_temporal),
-            self.temporal_net.dilation3(h4_temporal),
-            self.temporal_net.dilation4(h4_temporal)), 1)
+                               self.temporal_net.dilation1(h4_temporal),
+                               self.temporal_net.dilation2(h4_temporal),
+                               self.temporal_net.dilation3(h4_temporal),
+                               self.temporal_net.dilation4(h4_temporal)), 1)
         return spatial5, [h1_spatial, h2_spatial, h3_spatial], temporal5, [h1_temporal, h2_temporal, h3_temporal]
 
     def forward(self, img, flow, train_flow=True):

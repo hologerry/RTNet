@@ -1,26 +1,31 @@
 import torch
-from torchvision import models
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import models
+
 
 class out_block(nn.Module):
     def __init__(self, infilter):
         super(out_block, self).__init__()
         self.conv1 = nn.Sequential(*[nn.Conv2d(infilter, 64, 3, padding=1, bias=False), nn.BatchNorm2d(64), nn.ReLU(inplace=True)])
         self.conv2 = nn.Conv2d(64, 1, 1)
+
     def forward(self, x, H, W):
-        x= F.interpolate(self.conv1(x), (H, W), mode='bilinear', align_corners=True)
+        x = F.interpolate(self.conv1(x), (H, W), mode='bilinear', align_corners=True)
         return self.conv2(x)
+
 
 class decoder_stage(nn.Module):
     def __init__(self, infilter, midfilter, outfilter):
         super(decoder_stage, self).__init__()
         self.layer = nn.Sequential(*[nn.Conv2d(infilter, midfilter, 3, padding=1, bias=False), nn.BatchNorm2d(midfilter), nn.ReLU(inplace=True),
-                                nn.Conv2d(midfilter, midfilter, 3, padding=1, bias=False), nn.BatchNorm2d(midfilter), nn.ReLU(inplace=True),
-                                nn.Conv2d(midfilter, outfilter, 3, padding=1, bias=False), nn.BatchNorm2d(outfilter),
-                                nn.ReLU(inplace=True)])
+                                     nn.Conv2d(midfilter, midfilter, 3, padding=1, bias=False), nn.BatchNorm2d(midfilter), nn.ReLU(inplace=True),
+                                     nn.Conv2d(midfilter, outfilter, 3, padding=1, bias=False), nn.BatchNorm2d(outfilter),
+                                     nn.ReLU(inplace=True)])
+
     def forward(self, x):
         return self.layer(x)
+
 
 class Temporal(nn.Module):
     def __init__(self):

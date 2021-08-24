@@ -1,7 +1,9 @@
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 class RScaling(nn.Module):
     def __init__(self, in_planes, ratio):
@@ -10,19 +12,22 @@ class RScaling(nn.Module):
         self.fc1 = nn.Conv2d(in_planes*2, in_planes // ratio, 1)
         self.relu1 = nn.ReLU(True)
         self.fc2 = nn.Conv2d(in_planes // ratio, in_planes*2, 1)
-        self.in_planes=in_planes
+        self.in_planes = in_planes
+
     def forward(self, img, flow):
-        f = self.fc2(self.relu1(self.fc1(self.avg_pool(torch.cat([img, flow], 1)))))#B 2C 1 1
+        f = self.fc2(self.relu1(self.fc1(self.avg_pool(torch.cat([img, flow], 1)))))  # B 2C 1 1
         return img.mul(F.sigmoid(f[:, :self.in_planes, :, :]))+img, \
-               flow.mul(F.sigmoid(f[:, self.in_planes:, :, :]))+flow
+            flow.mul(F.sigmoid(f[:, self.in_planes:, :, :]))+flow
+
 
 class RGating(nn.Module):
     def __init__(self, in_planes):
         super(RGating, self).__init__()
         self.conv = nn.Sequential(nn.Conv2d(in_planes*2, 2, kernel_size=1), nn.Sigmoid())
+
     def forward(self, img, flow):
         gate = self.conv(torch.cat([img, flow], 1))
-        return img.mul(gate[:,:1,:,:])+img, flow.mul(gate[:,1:,:,:])+flow
+        return img.mul(gate[:, :1, :, :])+img, flow.mul(gate[:, 1:, :, :])+flow
 
 
 class SelfScaling(nn.Module):
@@ -32,15 +37,18 @@ class SelfScaling(nn.Module):
         self.fc1 = nn.Conv2d(in_planes, in_planes // ratio, 1)
         self.relu1 = nn.ReLU()
         self.fc2 = nn.Conv2d(in_planes // ratio, in_planes, 1)
-        self.in_planes=in_planes
+        self.in_planes = in_planes
+
     def forward(self, img):
-        f = self.fc2(self.relu1(self.fc1(self.avg_pool(img))))#B 2C 1 1
+        f = self.fc2(self.relu1(self.fc1(self.avg_pool(img))))  # B 2C 1 1
         return img.mul(F.sigmoid(f))+img
+
 
 class SelfGating(nn.Module):
     def __init__(self, in_planes):
         super(SelfGating, self).__init__()
         self.conv = nn.Sequential(nn.Conv2d(in_planes, 1, kernel_size=1), nn.Sigmoid())
+
     def forward(self, img):
         gate = self.conv(img)
         return img.mul(gate)+img
@@ -72,10 +80,11 @@ class ChannelAttention(nn.Module):
         self.fc1 = nn.Conv2d(in_planes*2, in_planes // ratio, 1)
         self.relu1 = nn.ReLU(True)
         self.fc2 = nn.Conv2d(in_planes // ratio, in_planes, 1)
-        self.in_planes=in_planes
+        self.in_planes = in_planes
+
     def forward(self, img, flow):
-        f = self.fc2(self.relu1(self.fc1(self.avg_pool(torch.cat([img, flow], 1)))))#B 2C 1 1
-        f=F.sigmoid(f)
+        f = self.fc2(self.relu1(self.fc1(self.avg_pool(torch.cat([img, flow], 1)))))  # B 2C 1 1
+        f = F.sigmoid(f)
         return img.mul(f), flow.mul(1-f)
 
 
@@ -84,10 +93,12 @@ class STAFM(nn.Module):
         super(STAFM, self).__init__()
         self.channel = ChannelAttention(inplanes, ratio=ratio)
         self.spatial = SpatialAttention()
+
     def forward(self, spatial, temporal):
         spatial, temporal = self.channel(spatial, temporal)
         feature = self.spatial(spatial, temporal)
         return feature
+
 
 class RTrans(nn.Module):
     def __init__(self, d_model, h=4):
@@ -107,11 +118,12 @@ class RTrans(nn.Module):
 
     def forward(self, q, k, v):
         B, C, H, W = q.size()
-        q, k, v = self.query(q).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W).transpose(2,3).contiguous(),\
-                  self.key(k).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W),\
-                  self.value(v).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W)
+        q, k, v = self.query(q).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W).transpose(2, 3).contiguous(),\
+            self.key(k).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W),\
+            self.value(v).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W)
         x = self.self_attention(q, k, v).view(B, self.d_model, H*W).view(B, self.d_model, H, W)
         return x
+
 
 class OldRTrans(nn.Module):
     def __init__(self, d_model, h=2):
@@ -134,9 +146,9 @@ class OldRTrans(nn.Module):
         B, C, H_org, W_org = q.size()
         q, k, v = self.maxpool(q), self.maxpool(k), self.maxpool(v)
         B, C, H, W = q.size()
-        q, k, v = self.query(q).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W).transpose(2,3).contiguous(), \
-                  self.key(k).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W), \
-                  self.value(v).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W)
+        q, k, v = self.query(q).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W).transpose(2, 3).contiguous(), \
+            self.key(k).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W), \
+            self.value(v).view(B, self.d_model, H*W).view(B, self.h, self.d_k, H*W)
         x = self.self_attention(q, k, v).view(B, self.d_model, H, W)
         return F.interpolate(x, (H_org, W_org), mode='bilinear', align_corners=True)
 
@@ -144,7 +156,7 @@ class OldRTrans(nn.Module):
 class RTModule(nn.Module):
     def __init__(self, channel, h, ST, redunction=False):
         super(RTModule, self).__init__()
-        self.ST=ST
+        self.ST = ST
         self.scaling = RScaling(channel, h)
         if redunction:
             self.transformation1 = OldRTrans(channel, h)
@@ -156,6 +168,7 @@ class RTModule(nn.Module):
             else:
                 self.transformation2 = RTrans(channel, h)
         self.gating = RGating(channel)
+
     def forward(self, x, y):
         x, y = self.scaling(x, y)
         x = self.transformation1(x, y, y)
@@ -179,8 +192,6 @@ class SelfModule(nn.Module):
 
     def forward(self, x):
         x = self.scaling(x)
-        x = self.transformation(x,x,x)
+        x = self.transformation(x, x, x)
         x = self.gating(x)
         return x
-
-

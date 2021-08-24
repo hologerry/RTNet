@@ -8,19 +8,21 @@ import os
 import train_loss
 import torch.nn.functional as F
 import numpy as np
-from Measurement import SMeasure
+# from Measurement import SMeasure
 from imageio import imwrite
 import argparse
 import torch.distributed as dist
 import random
+
+
 def my_collate_fn(batch):
     size = [256, 320, 384]
     H = size[np.random.randint(0, 3)]
     W = int(1.75*H)
     img = []
     label = []
-    fw_flow= []
-    bw_flow=[]
+    fw_flow = []
+    bw_flow = []
     for item in batch:
         img.append(F.interpolate(item['video'], (H, W), mode='bilinear', align_corners=True))
         label.append(F.interpolate(item['label'], (H, W), mode='bilinear', align_corners=True))
@@ -29,16 +31,19 @@ def my_collate_fn(batch):
     return {'video': torch.stack(img, 0), 'label': torch.stack(label, 0),
             "bwflow": torch.stack(bw_flow, 0), "fwflow": torch.stack(fw_flow, 0)}
 
+
 def adjust_learning_rate(optimizer, decay_count, decay_rate=.9):
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(1e-5, 5e-4 * pow(decay_rate, decay_count))
         print(param_group['lr'])
+
 
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
+
 
 if __name__ == '__main__':
     set_seed(1024)
@@ -71,11 +76,11 @@ if __name__ == '__main__':
     torch.cuda.set_device(args.local_rank)
     net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(Interactive(spatial_ckpt, temporal_ckpt))
     net = torch.nn.parallel.DistributedDataParallel(net.cuda(args.local_rank), device_ids=[args.local_rank], find_unused_parameters=True)
-    pretrained_net=[]
-    transformer=[]
+    pretrained_net = []
+    transformer = []
     for name, param in net.named_parameters():
         if "Transformer" in name:
-                transformer.append(param)
+            transformer.append(param)
         elif "spatial_net" in name or "temporal_net" in name:
             param.requires_grad = False
             pretrained_net.append(param)
@@ -91,7 +96,7 @@ if __name__ == '__main__':
         print("Successfully load: {}".format(model_name))
 
     optimizer.zero_grad()
-    tag=True
+    tag = True
     for epoch in range(1, epoch_num):
         running_loss = 0.0
         running_spatial_loss = 0.0
@@ -100,24 +105,24 @@ if __name__ == '__main__':
         iter_num = 0
         datasampler.set_epoch(epoch)
         net.train()
-        i=0
-        if tag and epoch>4:
+        i = 0
+        if tag and epoch > 4:
             lr = 5e-4
             for name, param in net.named_parameters():
-                param.requires_grad=True
+                param.requires_grad = True
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
-            tagx = False
-        if epoch>15:
+            tag = False
+        if epoch > 15:
             adjust_learning_rate(optimizer, (epoch-20))
         for data in dataloader:
             ite_num_per = ite_num_per + 1
-            i+=1
+            i += 1
             iter_num = iter_num + 1
             img, fw_flow, bw_flow, label = data['video'].cuda(args.local_rank), \
-                                           data['fwflow'].cuda(args.local_rank),\
-                                           data['bwflow'].cuda(args.local_rank),\
-                                           data['label'].cuda(args.local_rank)
+                data['fwflow'].cuda(args.local_rank),\
+                data['bwflow'].cuda(args.local_rank),\
+                data['label'].cuda(args.local_rank)
             B, Seq, C, H, W = img.size()
             spatial_out, temporal_out = net(img, torch.cat((fw_flow, bw_flow), 2))
             spatial_loss0, spatial_loss = train_loss.muti_bce_loss_fusion(spatial_out, label.view(B * Seq, 1, H, W))
@@ -129,12 +134,12 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            if iter_num%200==0:
+            if iter_num % 200 == 0:
                 print(
                     "[epoch: {}/{}, iter: {}/{}, iter: {}] train loss: {:.5f}, spatial: {:.5f}, temporal:{:5f}".format(
                         epoch, epoch_num, i, len(dataloader), iter_num,
                         running_loss / ite_num_per, running_spatial_loss / ite_num_per, running_temporal_loss / ite_num_per))
-        if args.local_rank==0:
+        if args.local_rank == 0:
             torch.save({'state_dict': net.state_dict(), 'optimizer': optimizer.state_dict()},
                        model_dir + "epoch_{}_loss_{:.5f}_spatial_{:.5f}_temporal_{:.5f}.pth".format(
                            epoch, running_loss / ite_num_per, running_spatial_loss / ite_num_per, running_temporal_loss / ite_num_per))
