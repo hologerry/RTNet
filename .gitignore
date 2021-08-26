@@ -141,3 +141,5 @@ cython_debug/
 
 # Custom
 saved_model
+models
+results*

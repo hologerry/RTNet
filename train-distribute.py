@@ -1,18 +1,20 @@
-import torch
-from torch.utils.data import DataLoader
-import torch.optim as optim
+import argparse
 import glob
-from dataset import RTDataset
-from model_R34 import Interactive
 import os
-import train_loss
-import torch.nn.functional as F
+import random
+
 import numpy as np
+import torch
+import torch.distributed as dist
+import torch.nn.functional as F
+import torch.optim as optim
 # from Measurement import SMeasure
 from imageio import imwrite
-import argparse
-import torch.distributed as dist
-import random
+from torch.utils.data import DataLoader
+
+import train_loss
+from dataset import RTDataset
+from model_R34 import Interactive
 
 
 def my_collate_fn(batch):

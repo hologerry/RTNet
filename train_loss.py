@@ -1,8 +1,8 @@
-import pytorch_ssim
-import pytorch_iou
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
+import pytorch_iou
+import pytorch_ssim
 
 bce_loss = nn.BCELoss(reduction='mean')
 ssim_loss = pytorch_ssim.SSIM(window_size=11, size_average=True)

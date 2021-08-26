@@ -133,3 +133,54 @@ class RTTestDataset(Dataset):
                 'bwflow': F.interpolate(torch.from_numpy(np.stack(bwflows, 0)).permute(0, 3, 1, 2), (self.H, self.W), mode='bilinear', align_corners=True),
                 "label_org": torch.from_numpy(np.stack([labels[0]], 0)).permute(0, 3, 1, 2),
                 "H": H, "W": W, 'name': self.img_list[item].split("/")[-1]}
+
+
+class RTTestNoLabelDataset(Dataset):
+    def __init__(self, path, T, H, W):
+        self.fwflow_list = []
+        self.bwflow_list = []
+        self.img_list = []
+        self.label_list = []
+        self.T = T
+        self.H, self.W = H, W
+        files = sorted(os.listdir(os.path.join(path, "img")))
+        for filename in files:
+            self.img_list.append(os.path.join(path, "img", filename))
+            self.label_list.append(os.path.join(path, "img", filename))  # use the image as a placeholder
+            self.fwflow_list.append(os.path.join(path, "fw_img", filename[:-3] + "png"))
+            self.bwflow_list.append(os.path.join(path, "bw_img", filename[:-3] + "png"))
+        self.dataset_len = len(self.img_list)
+
+    def __len__(self):
+        return len(self.img_list)
+
+    def __getitem__(self, item):
+        frame = [item]
+        scope = 10
+
+        other = np.random.randint(-scope, scope)
+        while item + other >= self.dataset_len or item + other < 0 or other == 0:
+            other = np.random.randint(-scope, scope)
+
+        frame.append(item + other)
+        videos, labels, fwflows, bwflows = [], [], [], []
+
+        for i in frame:
+            video = imread(self.img_list[i])
+            fw = imread(self.fwflow_list[i])
+            bw = imread(self.bwflow_list[i])
+            label = imread(self.label_list[i])
+            if len(label.shape) == 3:
+                label = label[:, :, 0]
+            label = label[:, :, np.newaxis]
+            videos.append(img_normalize(video.astype(np.float32) / 255.))
+            labels.append(label.astype(np.float32) / 255.)
+            fwflows.append(img_normalize(fw.astype(np.float32) / 255.))
+            bwflows.append(img_normalize(bw.astype(np.float32) / 255.))
+            H, W = labels[0].shape[0], labels[0].shape[1]
+
+        return {'video': F.interpolate(torch.from_numpy(np.stack(videos, 0)).permute(0, 3, 1, 2), (self.H, self.W), mode='bilinear', align_corners=True),
+                'fwflow': F.interpolate(torch.from_numpy(np.stack(fwflows, 0)).permute(0, 3, 1, 2), (self.H, self.W), mode='bilinear', align_corners=True),
+                'bwflow': F.interpolate(torch.from_numpy(np.stack(bwflows, 0)).permute(0, 3, 1, 2), (self.H, self.W), mode='bilinear', align_corners=True),
+                "label_org": torch.from_numpy(np.stack([labels[0]], 0)).permute(0, 3, 1, 2),
+                "H": H, "W": W, 'name': self.img_list[item].split("/")[-1]}
