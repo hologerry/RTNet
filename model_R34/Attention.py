@@ -15,8 +15,8 @@ class RScaling(nn.Module):
 
     def forward(self, img, flow):
         f = self.fc2(self.relu1(self.fc1(self.avg_pool(torch.cat([img, flow], 1)))))  # B 2C 1 1
-        return img.mul(F.sigmoid(f[:, :self.in_planes, :, :]))+img, \
-            flow.mul(F.sigmoid(f[:, self.in_planes:, :, :]))+flow
+        return img.mul(torch.sigmoid(f[:, :self.in_planes, :, :]))+img, \
+            flow.mul(torch.sigmoid(f[:, self.in_planes:, :, :]))+flow
 
 
 class RGating(nn.Module):
@@ -40,7 +40,7 @@ class SelfScaling(nn.Module):
 
     def forward(self, img):
         f = self.fc2(self.relu1(self.fc1(self.avg_pool(img))))  # B 2C 1 1
-        return img.mul(F.sigmoid(f))+img
+        return img.mul(torch.sigmoid(f))+img
 
 
 class SelfGating(nn.Module):
@@ -83,7 +83,7 @@ class ChannelAttention(nn.Module):
 
     def forward(self, img, flow):
         f = self.fc2(self.relu1(self.fc1(self.avg_pool(torch.cat([img, flow], 1)))))  # B 2C 1 1
-        f = F.sigmoid(f)
+        f = torch.sigmoid(f)
         return img.mul(f), flow.mul(1-f)
 
 

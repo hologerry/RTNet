@@ -22,7 +22,7 @@ def setup_seed(seed):
 if __name__ == '__main__':
     setup_seed(1024)
     model_dir = "./saved_model/"
-    results_dir = 'results_model_RX50'
+    results_dir = 'results_model_RX50_bwflow_only'
     os.makedirs(results_dir, exist_ok=True)
     batch_size_val = 1
     dataset = "../data/object_test"

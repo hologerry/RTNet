@@ -162,12 +162,15 @@ class RTTestNoLabelDataset(Dataset):
         while item + other >= self.dataset_len or item + other < 0 or other == 0:
             other = np.random.randint(-scope, scope)
 
+        # other = -1 if item > 0 else 1
+
         frame.append(item + other)
         videos, labels, fwflows, bwflows = [], [], [], []
 
         for i in frame:
             video = imread(self.img_list[i])
-            fw = imread(self.fwflow_list[i])
+            # fw = imread(self.fwflow_list[i])
+            fw = imread(self.bwflow_list[i])
             bw = imread(self.bwflow_list[i])
             label = imread(self.label_list[i])
             if len(label.shape) == 3:
