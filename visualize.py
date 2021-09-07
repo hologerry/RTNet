@@ -1,7 +1,7 @@
 from genericpath import exists
 import os
 import matplotlib.pyplot as plt
-from imageio import imread
+from cv2 import imread
 from mpl_toolkits.axes_grid1 import ImageGrid
 from tqdm import trange
 

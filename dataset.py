@@ -1,9 +1,10 @@
 import os
+import glob
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from imageio import imread
+from cv2 import imread
 from torch.utils.data import Dataset
 
 
@@ -68,6 +69,109 @@ class RTDataset(Dataset):
         label = torch.from_numpy(np.stack(labels, 0)).permute(0, 3, 1, 2)
         fwflow = torch.from_numpy(np.stack(fwflows, 0)).permute(0, 3, 1, 2)
         bwflow = torch.from_numpy(np.stack(bwflows, 0)).permute(0, 3, 1, 2)
+        if self.size is None:
+            return {'video': video,
+                    'label': label,
+                    'fwflow': fwflow,
+                    'bwflow': bwflow}
+        else:
+            return {'video': F.interpolate(video, (self.size, int(self.size*1.75)), mode='bilinear', align_corners=True),
+                    'label': F.interpolate(label, (self.size, int(self.size*1.75)), mode='bilinear', align_corners=True),
+                    'fwflow': F.interpolate(fwflow, (self.size, int(self.size*1.75)), mode='bilinear', align_corners=True),
+                    'bwflow': F.interpolate(bwflow, (self.size, int(self.size*1.75)), mode='bilinear', align_corners=True), }
+
+
+def load_images(img_list, label_list, fwflow_list, bwflow_list, dataset_name, seq_path):
+    images = glob.glob(os.path.join(seq_path, '*.jpg'))
+    images = sorted(images)
+    images.pop(0)  # pop first frame
+    images.pop(-1)  # pop last frame
+    labels = [img.replace('JPEGImages', 'Annotations').replace('.jpg', '.png') for img in images]
+    fwflows = [img.replace(dataset_name, dataset_name+'_flow_fw').replace('.jpg', '.png') for img in images]
+    bwflows = [img.replace(dataset_name, dataset_name+'_flow_bw').replace('.jpg', '.png') for img in images]
+    img_list += images
+    label_list += labels
+    fwflow_list += fwflows
+    bwflow_list += bwflows
+
+
+class RTSegDataset(Dataset):
+    def __init__(self, data_root, dataset_names, sub_datasets, size, scope=40, fw_only=False):
+        self.fwflow_list = []
+        self.bwflow_list = []
+        self.img_list = []
+        self.label_list = []
+        self.size = size
+        self.scope = scope
+        self.fw_only = fw_only
+
+        # ['PSEG', 'PSEG_v_flip', 'PSEG_h_flip', 'PSEG_hv_flip']
+        self.dataset_names = dataset_names
+        # ['blender_old', 'gen_mobilenet']
+        self.sub_datasets = sub_datasets
+
+        for dataset_name in self.dataset_names:
+            for sub_dataset in self.sub_datasets:
+                jpeg_path = os.path.join(data_root, dataset_name, sub_dataset, 'JPEGImages', '480p')
+
+                if sub_dataset == 'blender_old':
+                    sequences = os.listdir(jpeg_path)
+                    for seq in sequences:
+                        seq_path = os.path.join(jpeg_path, seq)
+                        load_images(self.img_list, self.label_list, self.fwflow_list, self.bwflow_list, dataset_name, seq_path)
+
+                elif sub_dataset == 'gen_mobilenet':
+                    challenges = os.listdir(jpeg_path)
+                    for cha in challenges:
+                        sequences = os.listdir(os.path.join(jpeg_path, cha))
+                        for seq in sequences:
+                            seq_path = os.path.join(jpeg_path, cha, seq)
+                            load_images(self.img_list, self.label_list, self.fwflow_list, self.bwflow_list, dataset_name, seq_path)
+
+
+        self.dataset_len = len(self.img_list)
+
+    def __len__(self):
+        return len(self.img_list)
+
+    def __getitem__(self, item):
+        frame = [item]
+        low = -self.scope
+        high = self.scope
+        other = np.random.randint(low, high)
+        # prevent from index error
+        while item + other >= self.dataset_len or item+other < 0 or other == 0:
+            other = np.random.randint(low, high)
+        name1 = self.img_list[item]
+        name2 = self.img_list[item+other]
+        # must from the same sequence
+        while name1.split('/')[-2] != name2.split('/')[-2]:
+            other = np.random.randint(low, high)
+            while item + other >= self.dataset_len or item + other < 0 or other == 0:
+                other = np.random.randint(low, high)
+            name2 = self.img_list[item + other]
+
+        frame.append(item+other)
+
+        videos, labels, fwflows, bwflows = [], [], [], []
+        for i in frame:
+            video = imread(self.img_list[i])
+            fw = imread(self.fwflow_list[i])
+            bw = fw if self.fw_only else imread(self.bwflow_list[i])
+            label = imread(self.label_list[i])
+            label_sum = np.sum(label, axis=2)
+            label_sum_mask = (label_sum > 0) * 255.0
+            label = label_sum_mask[:, :, np.newaxis]
+            videos.append(img_normalize(video.astype(np.float32) / 255.))
+            labels.append(label.astype(np.float32) / 255.)
+            fwflows.append(img_normalize(fw.astype(np.float32) / 255.))
+            bwflows.append(img_normalize(bw.astype(np.float32) / 255.))
+
+        video = torch.from_numpy(np.stack(videos, 0)).permute(0, 3, 1, 2)
+        label = torch.from_numpy(np.stack(labels, 0)).permute(0, 3, 1, 2)
+        fwflow = torch.from_numpy(np.stack(fwflows, 0)).permute(0, 3, 1, 2)
+        bwflow = torch.from_numpy(np.stack(bwflows, 0)).permute(0, 3, 1, 2)
+
         if self.size is None:
             return {'video': video,
                     'label': label,

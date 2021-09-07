@@ -4,7 +4,7 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
-from imageio import imwrite
+from cv2 import imwrite
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
