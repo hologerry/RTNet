@@ -99,7 +99,7 @@ def main(args):
         running_spatial_loss = 0.0
         running_temporal_loss = 0.0
         ite_num_per = 0
-        iter_num = 0
+
         datasampler.set_epoch(epoch)
         net.train()
         if tag and epoch > 4:
@@ -111,9 +111,8 @@ def main(args):
             tag = False
         if epoch > 15:
             adjust_learning_rate(optimizer, (epoch-20))
-        for data_idx, data in enumerate(dataloader):
-            ite_num_per = ite_num_per + 1
-            iter_num = iter_num + 1
+
+        for iter_idx, data in enumerate(dataloader):
             img, fw_flow, bw_flow, label = data['video'].cuda(args.local_rank), \
                 data['fwflow'].cuda(args.local_rank),\
                 data['bwflow'].cuda(args.local_rank),\
@@ -134,15 +133,15 @@ def main(args):
             loss.backward()
             optimizer.step()
 
-            if iter_num % args.log_freq == 0:
-                log_train_loss = running_loss / ite_num_per
-                log_spatial_loss = running_spatial_loss / ite_num_per
-                log_temporal_loss = running_temporal_loss / ite_num_per
-                logger.info(f"[epoch: {epoch}/{args.epoch_num}, iter: {data_idx}/{len(dataloader)}, iter: {iter_num}]"
+            if iter_idx % args.log_freq == 0:
+                log_train_loss = running_loss / (iter_idx + 1)
+                log_spatial_loss = running_spatial_loss / (iter_idx + 1)
+                log_temporal_loss = running_temporal_loss / (iter_idx + 1)
+                logger.info(f"[epoch: {epoch}/{args.epoch_num}, iter: {iter_idx}/{len(dataloader)}]"
                             f" train loss: {log_train_loss:.5f}, spatial: {log_spatial_loss:.5f}, temporal:{log_temporal_loss:5f}")
                 # tensorboard logger
                 if summary_writer is not None:
-                    step = (epoch - 1) * len(dataloader) + data_idx
+                    step = (epoch - 1) * len(dataloader) + iter_idx
                     summary_writer.add_scalar('lr', lr, step)
                     summary_writer.add_scalar('loss', log_train_loss, step)
                     summary_writer.add_scalar('spatial loss', log_spatial_loss, step)
@@ -167,25 +166,30 @@ if __name__ == '__main__':
     parser.add_argument('--base_lr', type=float, default=1e-3)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_root', type=str, default='./data')
-    parser.add_argument('--dataset_names', type=list, default=['PSEG', 'PSEG_v_flip', 'PSEG_h_flip', 'PSEG_hv_flip'])
+    parser.add_argument('--dataset_name_mode', type=int, default=0, help='convenient for parser')
+    parser.add_argument('--dataset_names', type=list, default=['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean'])
     parser.add_argument('--sub_datasets', type=list, default=['blender_old', 'gen_mobilenet'])
     parser.add_argument('--size', type=int, default=None)
     parser.add_argument('--scope', type=int, default=40)
     parser.add_argument('--fw_only', action='store_true')
-    # parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_RX50.pth')
-    parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_R34.pth')
-    # parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_RX50.pth')
-    parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_R34.pth')
+    parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_RX50.pth')
+    # parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_R34.pth')
+    parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_RX50.pth')
+    # parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_R34.pth')
     parser.add_argument('--log_freq', type=int, default=200)
+    parser.add_argument('--save_freq', type=int, default=1)
     parser.add_argument('--epoch_num', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--auto_resume', type=bool, default=True)
 
     args = parser.parse_args()
 
+    all_four_dataset_names = ['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean']
+    args.dataset_names = all_four_dataset_names[:args.dataset_name_mode+1]
+
     if args.debug:
         set_seed(0)
-        args.dataset_names = ['PSEG_debug']
+        args.dataset_names = ['PSEG_clean_debug']
         args.sub_datasets = ['gen_mobilenet', 'blender_old']
 
     torch.cuda.set_device(args.local_rank)
@@ -206,6 +210,5 @@ if __name__ == '__main__':
     logger.info(
         "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
     )
-
 
     main(args)

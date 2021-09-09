@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .spatial import Spatial
 from .temporal import Temporal
-from .Attention import RTModule, SelfModule, STAFM
+from .attention import RTModule, SelfModule, STAFM
 
 
 class Interactive(nn.Module):

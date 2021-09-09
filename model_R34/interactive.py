@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .Attention import STAFM, RTModule, SelfModule
+from .attention import STAFM, RTModule, SelfModule
 from .spatial import Spatial
 from .temporal import Temporal
 
