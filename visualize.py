@@ -25,7 +25,7 @@ os.makedirs(visualization_path, exist_ok=True)
 
 for i in trange(2, 4672):
     real_image_path = os.path.join(real_image_root_path, f"out-{i:05d}.jpg")
-    seg_img_paths = [os.path.join(seg_path, f"out-{i:05d}.jpg") for seg_path in seg_result_folders]
+    seg_img_paths = [os.path.join('results', seg_path, f"out-{i:05d}.jpg") for seg_path in seg_result_folders]
     real_img = [imread(real_image_path)]
     seg_imgs = [imread(seg_img_path) for seg_img_path in seg_img_paths]
 

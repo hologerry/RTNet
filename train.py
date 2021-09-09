@@ -21,6 +21,7 @@ import train_loss
 from dataset import RTSegDataset
 from logger import setup_logger
 from model_R34 import Interactive
+# from model_RX50 import Interactive
 
 
 def my_collate_fn(batch):
@@ -171,14 +172,21 @@ if __name__ == '__main__':
     parser.add_argument('--size', type=int, default=None)
     parser.add_argument('--scope', type=int, default=40)
     parser.add_argument('--fw_only', action='store_true')
-    parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_RX50.pth')
-    parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_RX50.pth')
+    # parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_RX50.pth')
+    parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_R34.pth')
+    # parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_RX50.pth')
+    parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_R34.pth')
     parser.add_argument('--log_freq', type=int, default=200)
     parser.add_argument('--epoch_num', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--auto_resume', type=bool, default=True)
 
     args = parser.parse_args()
+
+    if args.debug:
+        set_seed(0)
+        args.dataset_names = ['PSEG_debug']
+        args.sub_datasets = ['gen_mobilenet', 'blender_old']
 
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(backend='nccl')
@@ -199,9 +207,5 @@ if __name__ == '__main__':
         "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
     )
 
-    if args.debug:
-        set_seed(0)
-        args.dataset_names = ['PSEG']
-        args.sub_datasets = ['gen_mobilenet']
 
     main(args)

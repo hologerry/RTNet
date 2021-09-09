@@ -5,9 +5,9 @@ set -x
 
 exper_name='debug'
 
-python -m torch.distributed.launch --nproc_per_node=8 \
+python -m torch.distributed.launch --nproc_per_node=2 \
     RTNet/train.py \
-    --data_dir ./data \
+    --data_root ./data \
     --exper_name ${exper_name} \
     --batch_size 1 \
     --debug \
