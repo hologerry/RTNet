@@ -11,6 +11,8 @@ import torch.distributed as dist
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.backends import cudnn
+from torch.nn import SyncBatchNorm
+from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -20,8 +22,7 @@ from torch.utils.tensorboard import SummaryWriter
 import train_loss
 from dataset import RTSegDataset
 from logger import setup_logger
-# from model_R34 import Interactive
-from model_RX50 import Interactive
+
 
 
 def my_collate_fn(batch):
@@ -60,6 +61,29 @@ def load_checkpoint(args, model, optimizer):
     del checkpoint
     torch.cuda.empty_cache()
 
+def build_model(args):
+    if args.backbone == 'R34':
+        from model_R34 import Interactive
+    elif args.backbone == 'RX50':
+        from model_RX50 import Interactive
+    torch.cuda.set_device(args.local_rank)
+    net = SyncBatchNorm.convert_sync_batchnorm(Interactive(args.spatial_ckpt, args.temporal_ckpt))
+    net = DistributedDataParallel(net.cuda(args.local_rank), device_ids=[args.local_rank], find_unused_parameters=True)
+
+    pretrained_net = []
+    transformer = []
+    lr = args.base_lr
+    for name, param in net.named_parameters():
+        if "Transformer" in name:
+            transformer.append(param)
+        elif "spatial_net" in name or "temporal_net" in name:
+            param.requires_grad = False
+            pretrained_net.append(param)
+    param_group = [{"params": transformer, 'lr': lr},
+                   {"params": pretrained_net, "lr": 0}]
+    optimizer = optim.SGD(param_group, lr=lr, momentum=0.9, weight_decay=0.0005)
+
+    return net, optimizer
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -75,24 +99,10 @@ def main(args):
     dataloader = DataLoader(dataset, batch_size=args.batch_size, sampler=datasampler, num_workers=args.num_workers, collate_fn=my_collate_fn)
     logger.info(f"Training Set, DataSet Size:{len(dataset)}, DataLoader Size:{len(dataloader)}")
 
-    # ------- Define model --------
-    # define the net
-    torch.cuda.set_device(args.local_rank)
-    net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(Interactive(args.spatial_ckpt, args.temporal_ckpt))
-    net = torch.nn.parallel.DistributedDataParallel(net.cuda(args.local_rank), device_ids=[args.local_rank], find_unused_parameters=True)
-    pretrained_net = []
-    transformer = []
-    lr = args.base_lr
-    for name, param in net.named_parameters():
-        if "Transformer" in name:
-            transformer.append(param)
-        elif "spatial_net" in name or "temporal_net" in name:
-            param.requires_grad = False
-            pretrained_net.append(param)
-    param_group = [{"params": transformer, 'lr': lr},
-                   {"params": pretrained_net, "lr": 0}]
-    optimizer = optim.SGD(param_group, lr=lr, momentum=0.9, weight_decay=0.0005)
+    # Define model
+    net, optimizer = build_model(args)
 
+    # Auto resume
     if args.auto_resume:
         resume_file = os.path.join(args.output_dir, "current.pth")
         if os.path.exists(resume_file):
@@ -105,12 +115,13 @@ def main(args):
         assert os.path.isfile(args.resume)
         load_checkpoint(args, net, optimizer)
 
-    # tensorboard
+    # Tensorboard
     if dist.get_rank() == 0:
         summary_writer = SummaryWriter(log_dir=args.output_dir)
     else:
         summary_writer = None
 
+    # Training
     tag = True
     for epoch in range(args.start_epoch, args.epoch_num+1):
         running_loss = 0.0
@@ -176,6 +187,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--local_rank', type=int, default=-1,
                         help='node rank for distributed training')
+    parser.add_argument('--backbone', type=str, default='RX50', choices=['R34', 'RX50'])
     parser.add_argument('--output_root', type=str, default='RTNet_output/')
     parser.add_argument('--exper_name', type=str, required=True, help='experiment name')
     parser.add_argument('--output_dir', type=str, help='output_root/exper_name')
@@ -192,9 +204,7 @@ if __name__ == '__main__':
     parser.add_argument('--scope', type=int, default=40)
     parser.add_argument('--fw_only', action='store_true')
     parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_RX50.pth')
-    # parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_R34.pth')
     parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_RX50.pth')
-    # parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_R34.pth')
     parser.add_argument('--log_freq', type=int, default=200)
     parser.add_argument('--save_freq', type=int, default=1)
     parser.add_argument('--start_epoch', type=int, default=1)
@@ -203,7 +213,11 @@ if __name__ == '__main__':
     parser.add_argument('--auto_resume', type=bool, default=True)
     parser.add_argument('--resume', type=str, help='resume checkpoint path')
 
+
     args = parser.parse_args()
+
+    args.spatial_ckpt = f'./RTNet/models/spatial_{args.backbone}'
+    args.temporal_ckpt = f'./RTNet/models/temporal_{args.backbone}'
 
     all_four_dataset_names = ['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean']
     args.dataset_names = all_four_dataset_names[:args.dataset_name_mode+1]
