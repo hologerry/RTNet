@@ -9,7 +9,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset import RTTestNoLabelDataset
-from model_RX50 import Interactive
+from model_R34 import Interactive
+# from model_RX50 import Interactive
 
 
 def setup_seed(seed):
@@ -22,7 +23,7 @@ def setup_seed(seed):
 if __name__ == '__main__':
     setup_seed(1024)
     model_dir = "./saved_model/"
-    results_dir = 'results/results_model_RX50_bwflow_only'
+    results_dir = 'results/results_model_R34_bwflow_only'
     os.makedirs(results_dir, exist_ok=True)
     batch_size_val = 1
     dataset = "../data/object_test"
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     DAVIS_dataloader = DataLoader(DAVIS_dataset, batch_size=1, shuffle=False, num_workers=4)
 
     net = Interactive().cuda()
-    model_name = 'model_RX50.pth'
+    model_name = 'model_R34.pth'
     ckpt = torch.load(model_dir + model_name)['state_dict']
     model_dict = net.state_dict()
     pretrained_dict = {k[7:]: v for k, v in ckpt.items() if k[7:] in model_dict}
