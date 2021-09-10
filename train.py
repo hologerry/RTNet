@@ -20,8 +20,8 @@ from torch.utils.tensorboard import SummaryWriter
 import train_loss
 from dataset import RTSegDataset
 from logger import setup_logger
-from model_R34 import Interactive
-# from model_RX50 import Interactive
+# from model_R34 import Interactive
+from model_RX50 import Interactive
 
 
 def my_collate_fn(batch):
@@ -45,6 +45,20 @@ def adjust_learning_rate(optimizer, decay_count, decay_rate=.9):
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(1e-5, 5e-4 * pow(decay_rate, decay_count))
         logger.info(f"adjusting learning rate: {param_group['lr']}")
+
+
+def load_checkpoint(args, model, optimizer):
+    logger.info(f"=> loading checkpoint '{args.resume}'")
+
+    checkpoint = torch.load(args.resume, map_location='cpu')
+    args.start_epoch = checkpoint['epoch'] + 1
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+
+    logger.info(f"=> loaded successfully '{args.resume}' (epoch {checkpoint['epoch']})")
+
+    del checkpoint
+    torch.cuda.empty_cache()
 
 
 def set_seed(seed):
@@ -87,6 +101,10 @@ def main(args):
         else:
             logger.info(f'no checkpoint found in {args.output_dir}, ignoring auto resume')
 
+    if args.resume:
+        assert os.path.isfile(args.resume)
+        load_checkpoint(args, net, optimizer)
+
     # tensorboard
     if dist.get_rank() == 0:
         summary_writer = SummaryWriter(log_dir=args.output_dir)
@@ -94,14 +112,14 @@ def main(args):
         summary_writer = None
 
     tag = True
-    for epoch in range(1, args.epoch_num+1):
+    for epoch in range(args.start_epoch, args.epoch_num+1):
         running_loss = 0.0
         running_spatial_loss = 0.0
         running_temporal_loss = 0.0
-        ite_num_per = 0
 
         datasampler.set_epoch(epoch)
         net.train()
+
         if tag and epoch > 4:
             lr = 5e-4
             for name, param in net.named_parameters():
@@ -137,20 +155,20 @@ def main(args):
                 log_train_loss = running_loss / (iter_idx + 1)
                 log_spatial_loss = running_spatial_loss / (iter_idx + 1)
                 log_temporal_loss = running_temporal_loss / (iter_idx + 1)
-                logger.info(f"[epoch: {epoch}/{args.epoch_num}, iter: {iter_idx}/{len(dataloader)}]"
-                            f" train loss: {log_train_loss:.5f}, spatial: {log_spatial_loss:.5f}, temporal:{log_temporal_loss:5f}")
+                logger.info(f"[Epoch: {epoch}/{args.epoch_num}, iter: {iter_idx}/{len(dataloader)}]"
+                            f" Train loss: {log_train_loss:.5f}, spatial loss: {log_spatial_loss:.5f}, temporal loss: {log_temporal_loss:5f}")
                 # tensorboard logger
                 if summary_writer is not None:
                     step = (epoch - 1) * len(dataloader) + iter_idx
                     summary_writer.add_scalar('lr', lr, step)
                     summary_writer.add_scalar('loss', log_train_loss, step)
-                    summary_writer.add_scalar('spatial loss', log_spatial_loss, step)
-                    summary_writer.add_scalar('temporal loss', log_temporal_loss, step)
+                    summary_writer.add_scalar('spatial_loss', log_spatial_loss, step)
+                    summary_writer.add_scalar('temporal_loss', log_temporal_loss, step)
 
         if dist.get_rank() == 0 and (epoch % args.save_freq == 0 or epoch == args.epochs):
             logger.info('==> Saving...')
             file_name = os.path.join(args.output_dir, f'ckpt_epoch_{epoch}.pth')
-            torch.save({'state_dict': net.state_dict(), 'optimizer': optimizer.state_dict()}, file_name)
+            torch.save({'epoch': epoch, 'model': net.state_dict(), 'optimizer': optimizer.state_dict()}, file_name)
             copyfile(file_name, os.path.join(args.output_dir, 'current.pth'))
 
 
@@ -179,9 +197,11 @@ if __name__ == '__main__':
     # parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_R34.pth')
     parser.add_argument('--log_freq', type=int, default=200)
     parser.add_argument('--save_freq', type=int, default=1)
+    parser.add_argument('--start_epoch', type=int, default=1)
     parser.add_argument('--epoch_num', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--auto_resume', type=bool, default=True)
+    parser.add_argument('--resume', type=str, help='resume checkpoint path')
 
     args = parser.parse_args()
 
@@ -194,7 +214,7 @@ if __name__ == '__main__':
     if args.debug:
         set_seed(0)
         args.dataset_names = ['PSEG_clean_debug']
-        args.sub_datasets = ['gen_mobilenet', 'blender_old']
+        args.sub_datasets = ['blender_old']
 
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(backend='nccl')
@@ -203,7 +223,7 @@ if __name__ == '__main__':
     # setup logger
     args.output_dir = os.path.join(args.output_root, args.exper_name)
     os.makedirs(args.output_dir, exist_ok=True)
-    logger = setup_logger(output=args.output_dir, distributed_rank=dist.get_rank(), name="contrast")
+    logger = setup_logger(output=args.output_dir, distributed_rank=dist.get_rank(), name=args.exper_name)
     if dist.get_rank() == 0:
         path = os.path.join(args.output_dir, "config.json")
         with open(path, 'w') as f:
