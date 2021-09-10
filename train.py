@@ -166,9 +166,10 @@ if __name__ == '__main__':
     parser.add_argument('--base_lr', type=float, default=1e-3)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_root', type=str, default='./data')
-    parser.add_argument('--dataset_name_mode', type=int, default=0, help='convenient for parser')
     parser.add_argument('--dataset_names', type=list, default=['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean'])
+    parser.add_argument('--dataset_name_mode', type=int, default=0, help='convenient for parser')
     parser.add_argument('--sub_datasets', type=list, default=['blender_old', 'gen_mobilenet'])
+    parser.add_argument('--sub_dataset_mode', type=int, default=2, help="used sub_datasets")
     parser.add_argument('--size', type=int, default=None)
     parser.add_argument('--scope', type=int, default=40)
     parser.add_argument('--fw_only', action='store_true')
@@ -186,6 +187,9 @@ if __name__ == '__main__':
 
     all_four_dataset_names = ['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean']
     args.dataset_names = all_four_dataset_names[:args.dataset_name_mode+1]
+
+    all_sub_datasets = ['blender_old', 'gen_mobilenet']
+    args.sub_datasets = [all_sub_datasets[args.sub_dataset_mode]] if 0 <= args.sub_dataset_mode < len(all_sub_datasets) else all_sub_datasets
 
     if args.debug:
         set_seed(0)
