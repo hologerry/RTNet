@@ -163,6 +163,7 @@ def main(args):
             optimizer.step()
 
             if iter_idx % args.log_freq == 0:
+                lr = optimizer.param_groups[0]['lr']
                 log_train_loss = running_loss / (iter_idx + 1)
                 log_spatial_loss = running_spatial_loss / (iter_idx + 1)
                 log_temporal_loss = running_temporal_loss / (iter_idx + 1)
