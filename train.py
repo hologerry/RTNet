@@ -61,6 +61,7 @@ def load_checkpoint(args, model, optimizer):
     del checkpoint
     torch.cuda.empty_cache()
 
+
 def build_model(args):
     if args.backbone == 'R34':
         from model_R34 import Interactive
@@ -84,6 +85,7 @@ def build_model(args):
     optimizer = optim.SGD(param_group, lr=lr, momentum=0.9, weight_decay=0.0005)
 
     return net, optimizer
+
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -197,7 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--base_lr', type=float, default=1e-3)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--data_root', type=str, default='./data')
-    parser.add_argument('--dataset_names', type=list, default=['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean'])
+    parser.add_argument('--dataset_names', type=list, default=['PSEG_clean_small', 'PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean'])
     parser.add_argument('--dataset_name_mode', type=int, default=0, help='convenient for parser')
     parser.add_argument('--sub_datasets', type=list, default=['blender_old', 'gen_mobilenet'])
     parser.add_argument('--sub_dataset_mode', type=int, default=2, help="used sub_datasets")
@@ -214,13 +216,12 @@ if __name__ == '__main__':
     parser.add_argument('--auto_resume', type=bool, default=True)
     parser.add_argument('--resume', type=str, help='resume checkpoint path')
 
-
     args = parser.parse_args()
 
     args.spatial_ckpt = f'./RTNet/models/spatial_{args.backbone}.pth'
     args.temporal_ckpt = f'./RTNet/models/temporal_{args.backbone}.pth'
 
-    all_four_dataset_names = ['PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean']
+    all_four_dataset_names = ['PSEG_clean_small', 'PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean']
     args.dataset_names = all_four_dataset_names[:args.dataset_name_mode+1]
 
     all_sub_datasets = ['blender_old', 'gen_mobilenet']
@@ -228,8 +229,8 @@ if __name__ == '__main__':
 
     if args.debug:
         set_seed(0)
-        args.dataset_names = ['PSEG_clean_debug']
-        args.sub_datasets = ['blender_old']
+        args.dataset_names = ['PSEG_clean_small']
+        args.sub_datasets = ['gen_mobilenet']
 
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(backend='nccl')

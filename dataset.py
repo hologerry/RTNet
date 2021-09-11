@@ -159,14 +159,12 @@ class RTSegDataset(Dataset):
             fw = imread(self.fwflow_list[i])
             bw = fw if self.fw_only else imread(self.bwflow_list[i])
             label = imread(self.label_list[i])
-            if video is None:
-                print("video is none", self.img_list[i])
-            if fw is None:
-                print("fw is none", self.fwflow_list[i])
-            if bw is None:
-                print("bw is none", self.bwflow_list[i])
-            if label is None:
-                print("label is none", self.label_list[i])
+
+            assert video is not None, f"video is none {self.img_list[i]}"
+            assert fw is not None, f"fw is none {self.fwflow_list[i]}"
+            assert bw is not None, f"bw is none {self.bwflow_list[i]}"
+            assert label is not None, f"label is none {self.label_list[i]}"
+
             label_sum = np.sum(label, axis=2)
             label_sum_mask = (label_sum > 0) * 255.0
             label = label_sum_mask[:, :, np.newaxis]

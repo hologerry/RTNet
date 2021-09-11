@@ -11,3 +11,4 @@ python -m torch.distributed.launch --nproc_per_node=2 \
     --exper_name ${exper_name} \
     --batch_size 1 \
     --debug \
+    --backbone R34 \
