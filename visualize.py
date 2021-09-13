@@ -1,12 +1,14 @@
-from genericpath import exists
 import os
+
 import matplotlib.pyplot as plt
-from cv2 import imread
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import numpy as np
+from cv2 import imread, imwrite
 from mpl_toolkits.axes_grid1 import ImageGrid
 from tqdm import trange
 
 
-visualization_path = 'visualization'
+visualization_path = 'visualization_RX50_s'
 
 real_image_root_path = '/D_data/Seg/data/object_test/img'
 
@@ -32,7 +34,8 @@ for i in trange(2, 4672):
     imgs = real_img + seg_imgs
 
     # plt.axis('off')
-    fig = plt.figure(figsize=(8., 8.))
+    fig = plt.figure(figsize=(8., 8.), dpi=100)
+    canvas = FigureCanvasAgg(fig)
 
     grid = ImageGrid(fig, 111,  # similar to subplot(111)
                      nrows_ncols=(4, 2),  # creates 2x2 grid of axes
@@ -46,9 +49,12 @@ for i in trange(2, 4672):
         ax.set_title(l)
         ax.axis('off')
 
+    plt.tight_layout()
+    canvas.draw()
+    buf = canvas.buffer_rgba()
+    img = np.asarray(buf)
     out_path = os.path.join(visualization_path, f"out-{i:05d}.jpg")
 
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=300)
+    imwrite(out_path, img)
     plt.close()
 

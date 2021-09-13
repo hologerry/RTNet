@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset import RTTestNoLabelDataset
-from model_R34 import Interactive
-# from model_RX50 import Interactive
+# from model_R34 import Interactive
+from model_RX50 import Interactive
 
 
 def setup_seed(seed):
@@ -22,18 +22,19 @@ def setup_seed(seed):
 
 if __name__ == '__main__':
     setup_seed(1024)
-    model_dir = "./saved_model/"
-    results_dir = 'results/results_model_R34_bwflow_only'
+    model_dir = "../RTNet_output/pseg_scope40_rx50_gen_mobilenet_small_bs2/"
+    results_dir = '../RTNet_output/pseg_scope40_rx50_gen_mobilenet_small_bs2/results'
+    fw_only = False
     os.makedirs(results_dir, exist_ok=True)
     batch_size_val = 1
     dataset = "../data/object_test"
 
-    DAVIS_dataset = RTTestNoLabelDataset(dataset, 2, 384, int(384 * 1.75))
+    DAVIS_dataset = RTTestNoLabelDataset(dataset, 2, 384, int(384 * 1.75), fw_only=fw_only)
     DAVIS_dataloader = DataLoader(DAVIS_dataset, batch_size=1, shuffle=False, num_workers=4)
 
     net = Interactive().cuda()
-    model_name = 'model_R34.pth'
-    ckpt = torch.load(model_dir + model_name)['state_dict']
+    model_name = 'current.pth'
+    ckpt = torch.load(model_dir + model_name)['model']
     model_dict = net.state_dict()
     pretrained_dict = {k[7:]: v for k, v in ckpt.items() if k[7:] in model_dict}
     model_dict.update(pretrained_dict)

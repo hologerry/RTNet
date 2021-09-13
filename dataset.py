@@ -246,13 +246,14 @@ class RTTestDataset(Dataset):
 
 
 class RTTestNoLabelDataset(Dataset):
-    def __init__(self, path, T, H, W):
+    def __init__(self, path, T, H, W, fw_only=False):
         self.fwflow_list = []
         self.bwflow_list = []
         self.img_list = []
         self.label_list = []
         self.T = T
         self.H, self.W = H, W
+        self.fw_only = fw_only
         files = sorted(os.listdir(os.path.join(path, "img")))
         for filename in files:
             self.img_list.append(os.path.join(path, "img", filename))
@@ -280,7 +281,7 @@ class RTTestNoLabelDataset(Dataset):
         for i in frame:
             video = imread(self.img_list[i])
             fw = imread(self.fwflow_list[i])
-            bw = imread(self.bwflow_list[i])
+            bw = fw if self.fw_only else imread(self.bwflow_list[i])
             label = imread(self.label_list[i])
             if len(label.shape) == 3:
                 label = label[:, :, 0]
