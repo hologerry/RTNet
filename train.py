@@ -206,6 +206,7 @@ if __name__ == '__main__':
     parser.add_argument('--size', type=int, default=None)
     parser.add_argument('--scope', type=int, default=40)
     parser.add_argument('--fw_only', action='store_true')
+    parser.add_argument('--scratch', action='store_true')
     parser.add_argument('--spatial_ckpt', type=str, default='./RTNet/models/spatial_RX50.pth')
     parser.add_argument('--temporal_ckpt', type=str, default='./RTNet/models/temporal_RX50.pth')
     parser.add_argument('--log_freq', type=int, default=200)
@@ -220,6 +221,9 @@ if __name__ == '__main__':
 
     args.spatial_ckpt = f'./RTNet/models/spatial_{args.backbone}.pth'
     args.temporal_ckpt = f'./RTNet/models/temporal_{args.backbone}.pth'
+    if args.scratch:
+        args.spatial_ckpt = None
+        args.temporal_ckpt = None
 
     all_four_dataset_names = ['PSEG_clean_small', 'PSEG_clean', 'PSEG_v_flip_clean', 'PSEG_h_flip_clean', 'PSEG_hv_flip_clean']
     args.dataset_names = all_four_dataset_names[:args.dataset_name_mode+1]
