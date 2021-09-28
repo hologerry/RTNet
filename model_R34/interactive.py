@@ -191,3 +191,18 @@ class Interactive(nn.Module):
         else:
             spatial, spatial_feature, temporal, temporal_feature = self.encoder(img, flow)
             return self.spatial_decoder(spatial, spatial_feature, temporal_feature)
+
+
+
+if __name__ == '__main__':
+    from ptflops import get_model_complexity_info
+
+    net = Interactive()
+    with torch.cuda.device(0):
+        macs, params = get_model_complexity_info(net, (2, 9, 160, 96), as_strings=True, print_per_layer_stat=True, verbose=True)
+        print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+        print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+
+        data = torch.randn((2, 2, 9, 224, 224))
+        out = net(data)
+        print(out[0].size())

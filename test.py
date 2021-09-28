@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from dataset import RTTestNoLabelDataset
-# from model_R34 import Interactive
-from model_RX50 import Interactive
+from model_R34 import Interactive
+# from model_RX50 import Interactive
 
 
 def setup_seed(seed):
@@ -22,8 +22,8 @@ def setup_seed(seed):
 
 if __name__ == '__main__':
     setup_seed(1024)
-    model_dir = "../RTNet_output/pseg_scope40_rx50_gen_mobilenet_small_bs2/"
-    results_dir = '../RTNet_output/pseg_scope40_rx50_gen_mobilenet_small_bs2/results'
+    model_dir = "../RTNet_output/pseg_scope40_r34_gen_mobilenet_small_bs2_scratch/"
+    results_dir = '../RTNet_output/pseg_scope40_r34_gen_mobilenet_small_bs2_scratch/results'
     fw_only = False
     os.makedirs(results_dir, exist_ok=True)
     batch_size_val = 1

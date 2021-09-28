@@ -231,10 +231,6 @@ if __name__ == '__main__':
     all_sub_datasets = ['blender_old', 'gen_mobilenet']
     args.sub_datasets = [all_sub_datasets[args.sub_dataset_mode]] if 0 <= args.sub_dataset_mode < len(all_sub_datasets) else all_sub_datasets
 
-    if args.debug:
-        set_seed(0)
-        args.dataset_names = ['PSEG_clean_small']
-        args.sub_datasets = ['gen_mobilenet']
 
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(backend='nccl')
